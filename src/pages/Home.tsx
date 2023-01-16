@@ -8,14 +8,12 @@ import {
   Button,
 } from "@mui/material";
 import { Container } from "@mui/system";
-import { useMutation, useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import styled from "styled-components";
+import { useGetBreedList, useGetCatsByBreedData } from "../api/cats";
 import CatCard from "../components/CatCard";
 import Spinner from "../components/Spinner";
-import { Cat, useCats } from "../context/catContext";
-import { useNotification } from "../context/notificationCTx";
-import { Config } from "../utils/config";
+import { useCats } from "../context/catContext";
 
 const Heading = styled.h1`
   font-size: 3rem;
@@ -37,73 +35,25 @@ const Text = styled.p`
   opacity: 0.5;
 `;
 
-interface Mutation {
+export interface CatsByBreedParams {
   page: number;
   id: string;
 }
 
-const limit = 10;
-
 const Home = () => {
-  const notCtx = useNotification();
-
   const state = useCats();
 
   const [loading, seLoading] = useState(false);
 
   const [loadMoreLoading, setLoadMoreLoading] = useState(false);
 
-  const { data: breedsList } = useQuery(
-    ["breeds"],
-    async () => {
-      const res = await fetch(`${Config.apiUrl}breeds`);
-      const result = await res.json();
+  const { data: breedsList } = useGetBreedList();
 
-      return result;
-    },
-    {
-      onError: () => {
-        notCtx?.setProperties({
-          content:
-            "Apologies but we could not load new cats for you at this time! Miau!",
-          type: "error",
-          title: "Error",
-        });
+  const { mutate } = useGetCatsByBreedData();
 
-        notCtx?.show();
-      },
-      staleTime: 10000,
-    }
-  );
-
-  const mutation = useMutation({
-    mutationKey: ["catsByBreed"],
-    mutationFn: async (data: Mutation) => {
-      const res = await fetch(
-        `${Config.apiUrl}images/search?page=${data.page}&limit=${limit}&breed_id=${data.id}`
-      );
-
-      let catsFromState: Cat[] = [];
-
-      if (data.id === state?.selectedBreed) {
-        catsFromState = state?.cats;
-      }
-
-      const result: Cat[] = await res.json();
-      state?.setCats([...catsFromState, ...result]);
-      return result;
-    },
-    onError: () => {
-      notCtx?.setProperties({
-        content:
-          "Apologies but we could not load new cats for you at this time! Miau!",
-        type: "error",
-        title: "Error",
-      });
-
-      notCtx?.show();
-    },
-  });
+  const fetchCatsByBreeds = (page: number, id: string) => {
+    mutate({ page, id });
+  };
 
   return (
     <>
@@ -124,29 +74,26 @@ const Home = () => {
 
                 // when selected value is different from choosing value reset page
                 seLoading(true);
+
                 if (state?.selectedBreed !== e.target.value) {
                   state?.setPage(1);
                   state?.setCats([]);
-                  await mutation.mutate({
-                    page: 1,
-                    id: e.target.value,
-                  });
+                  fetchCatsByBreeds(1, e.target.value);
                 } else {
-                  await mutation.mutate({
-                    page: state?.page || 1,
-                    id: e.target.value,
-                  });
+                  fetchCatsByBreeds(state?.page || 1, e.target.value);
                 }
 
                 seLoading(false);
               }}
             >
               {breedsList &&
-                breedsList?.map((breed: any) => (
-                  <MenuItem key={breed.id} value={breed.id}>
-                    {breed.name}
-                  </MenuItem>
-                ))}
+                breedsList?.map((breed: any, i: number) => {
+                  return (
+                    <MenuItem key={`${breed.id}-${i}`} value={breed.id}>
+                      {breed.name}
+                    </MenuItem>
+                  );
+                })}
             </Select>
           </FormControl>
         </Box>
@@ -159,8 +106,8 @@ const Home = () => {
             <Grid container spacing={2}>
               {Array.isArray(state?.cats) &&
                 state?.cats &&
-                state?.cats.map((cat: any) => (
-                  <Grid key={cat.id} item xs={6} md={3}>
+                state?.cats.map((cat: any, i: number) => (
+                  <Grid key={`${cat.id}-${i}`} item xs={6} md={3}>
                     <CatCard id={cat.id} url={cat.url} />
                   </Grid>
                 ))}
@@ -187,10 +134,8 @@ const Home = () => {
                 setLoadMoreLoading(true);
                 const page = (state?.page || 1) + 1;
                 state?.setPage(page);
-                mutation.mutate({
-                  page,
-                  id: state?.selectedBreed || "",
-                });
+                fetchCatsByBreeds(page, state.selectedBreed || "");
+
                 setLoadMoreLoading(false);
               }}
             >

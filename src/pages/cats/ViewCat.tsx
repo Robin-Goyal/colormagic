@@ -1,8 +1,10 @@
 import { Button, CardMedia } from "@mui/material";
 import { Box, Container } from "@mui/system";
 import { useQuery } from "@tanstack/react-query";
+import { useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import styled from "styled-components";
+import { useGetCatDetails } from "../../api/cats";
 import { useNotification } from "../../context/notificationCTx";
 import { Config } from "../../utils/config";
 
@@ -40,33 +42,16 @@ const Description = styled.p`
   margin-bottom: 1rem;
 `;
 
+const Image = styled.img`
+  width: 100%;
+  height: auto;
+`;
+
 const ViewCat = () => {
-  const notCtx = useNotification();
   const { catId } = useParams();
   const navigate = useNavigate();
 
-  const { data: cat } = useQuery(
-    ["cat"],
-    async () => {
-      const res = await fetch(`${Config.apiUrl}images/${catId}`);
-      const result = await res.json();
-
-      return result;
-    },
-    {
-      onError: () => {
-        notCtx?.setProperties({
-          content:
-            "Apologies but we could not load new cats for you at this time! Miau!",
-          type: "error",
-          title: "Error",
-        });
-
-        notCtx?.show();
-      },
-      staleTime: 10000,
-    }
-  );
+  const { data: cat } = useGetCatDetails(catId as string);
 
   return (
     <Container maxWidth="xl">
@@ -93,13 +78,7 @@ const ViewCat = () => {
         <>
           <Box width={"100%"}>
             <Box marginBottom={"2rem"}>
-              <CardMedia
-                component="img"
-                width={"100%"}
-                height={"auto"}
-                image={cat.url}
-                alt={cat.url}
-              />
+              <Image src={cat.url} alt={cat.url} />
             </Box>
           </Box>
           {cat.breeds && cat.breeds.length > 0 && (
